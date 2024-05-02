@@ -14,20 +14,20 @@
 
 using namespace std;
 
+// Muestra el tablero actualizando los espacios vacíos con puntos ('.')
 void showBoard(char board[][COLS], int client_sock) {
     string display = "\n";
     for (int i = 0; i < ROWS; i++) {
-        display += "\t\t\t  ";
         for (int j = 0; j < COLS; j++) {
-            display += board[i][j];
-            if (j < COLS - 1) display += " | ";
+            display += board[i][j] == ' ' ? ". " : string(1, board[i][j]) + " ";
         }
-        if (i < ROWS - 1) display += "\n\t\t\t---------------------\n";
+        display += "\n";
     }
-    display += "\n\n";
+    display += "Enter the column number (1-7) to place your disc:\n";
     send(client_sock, display.c_str(), display.length(), 0);
 }
 
+// Inicializa el tablero con espacios vacíos
 void initialise(char board[][COLS]) {
     for (int i = 0; i < ROWS; i++) {
         for (int j = 0; j < COLS; j++)
@@ -35,6 +35,7 @@ void initialise(char board[][COLS]) {
     }
 }
 
+// Verifica si hay cuatro fichas consecutivas
 bool checkFour(char board[][COLS], char token) {
     // Horizontal check
     for (int i = 0; i < ROWS; i++) {
@@ -43,6 +44,7 @@ bool checkFour(char board[][COLS], char token) {
                 return true;
         }
     }
+
     // Vertical check
     for (int j = 0; j < COLS; j++) {
         for (int i = 0; i < ROWS - 3; i++) {
@@ -50,7 +52,8 @@ bool checkFour(char board[][COLS], char token) {
                 return true;
         }
     }
-    // Diagonal check
+
+    // Diagonal checks
     for (int i = 0; i < ROWS - 3; i++) {
         for (int j = 0; j < COLS - 3; j++) {
             if (board[i][j] == token && board[i + 1][j + 1] == token && board[i + 2][j + 2] == token && board[i + 3][j + 3] == token)
@@ -61,13 +64,16 @@ bool checkFour(char board[][COLS], char token) {
                 return true;
         }
     }
+
     return false;
 }
 
+// Verifica si el juego ha terminado
 bool gameOver(char board[][COLS]) {
     return checkFour(board, COMPUTERMOVE) || checkFour(board, HUMANMOVE);
 }
 
+// Maneja cada juego individualmente
 void* playGame(void* arg) {
     int client_sock = *((int*)arg);
     char board[ROWS][COLS];
@@ -78,41 +84,52 @@ void* playGame(void* arg) {
     int n_bytes;
 
     while ((n_bytes = recv(client_sock, buffer, 1024, 0)) > 0) {
-        buffer[n_bytes] = '\0';  // Null-terminate string
-        int column = atoi(buffer) - 1;  // Convert buffer to column index
+        buffer[n_bytes] = '\0'; // Null-terminate string
+        int column = atoi(buffer) - 1; // Convert buffer to column index
 
         if (column >= 0 && column < COLS) {
-            // Drop token in the selected column
-            for (int i = ROWS - 1; i >= 0; i--) {
+            bool validMove = false;
+            for (int i = ROWS - 1; i >= 0 && !validMove; i--) {
                 if (board[i][column] == ' ') {
                     board[i][column] = HUMANMOVE;
+                    validMove = true;
+                }
+            }
+
+            if (!validMove) {
+                const char* msg = "Column full. Try another one.\n";
+                send(client_sock, msg, strlen(msg), 0);
+            } else {
+                if (gameOver(board)) {
+                    const char* winMsg = "Game Over: You win!\n";
+                    send(client_sock, winMsg, strlen(winMsg), 0);
+                    break;
+                }
+
+                // Computer's move
+                do {
+                    column = rand() % COLS;
+                    validMove = false;
+                    for (int i = ROWS - 1; i >= 0 && !validMove; i--) {
+                        if (board[i][column] == ' ') {
+                            board[i][column] = COMPUTERMOVE;
+                            validMove = true;
+                        }
+                    }
+                } while (!validMove);
+
+                if (gameOver(board)) {
+                    const char* loseMsg = "Game Over: Computer wins!\n";
+                    send(client_sock, loseMsg, strlen(loseMsg), 0);
                     break;
                 }
             }
+        } else {
+            const char* errMsg = "Invalid input. Please enter a column number from 1 to 7.\n";
+            send(client_sock, errMsg, strlen(errMsg), 0);
         }
 
         showBoard(board, client_sock);
-        if (gameOver(board)) {
-            char winMsg[] = "Game Over: You win!";
-            send(client_sock, winMsg, sizeof(winMsg), 0);
-            break;
-        }
-
-        // Computer's move
-        int compColumn = rand() % COLS;
-        for (int i = ROWS - 1; i >= 0; i--) {
-            if (board[i][compColumn] == ' ') {
-                board[i][compColumn] = COMPUTERMOVE;
-                break;
-            }
-        }
-        
-        showBoard(board, client_sock);
-        if (gameOver(board)) {
-            char loseMsg[] = "Game Over: Computer wins!";
-            send(client_sock, loseMsg, sizeof(loseMsg), 0);
-            break;
-        }
     }
 
     close(client_sock);
@@ -120,6 +137,7 @@ void* playGame(void* arg) {
     return NULL;
 }
 
+// Configura el servidor y escucha las conexiones entrantes
 int main(int argc, char **argv) {
     int port = 12345;
     if (argc > 1) port = atoi(argv[1]);
