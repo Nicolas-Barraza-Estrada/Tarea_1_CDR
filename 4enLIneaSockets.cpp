@@ -14,7 +14,20 @@
 
 using namespace std;
 
-// Muestra el tablero actualizando los espacios vacíos con puntos ('.')
+void showBoard(char board[][COLS], int client_sock);
+void initialise(char board[][COLS]);
+bool checkFour(char board[][COLS], char token);
+bool gameOver(char board[][COLS]);
+void computerMove(char board[][COLS], int client_sock);
+
+void initialise(char board[][COLS]) {
+    for (int i = 0; i < ROWS; i++) {
+        for (int j = 0; j < COLS; j++) {
+            board[i][j] = ' ';
+        }
+    }
+}
+
 void showBoard(char board[][COLS], int client_sock) {
     string display = "\n";
     for (int i = 0; i < ROWS; i++) {
@@ -27,65 +40,88 @@ void showBoard(char board[][COLS], int client_sock) {
     send(client_sock, display.c_str(), display.length(), 0);
 }
 
-// Inicializa el tablero con espacios vacíos
-void initialise(char board[][COLS]) {
-    for (int i = 0; i < ROWS; i++) {
-        for (int j = 0; j < COLS; j++)
-            board[i][j] = ' ';
-    }
-}
-
-// Verifica si hay cuatro fichas consecutivas
 bool checkFour(char board[][COLS], char token) {
-    // Horizontal check
+    // Horizontal, vertical, and diagonal checks
     for (int i = 0; i < ROWS; i++) {
         for (int j = 0; j < COLS - 3; j++) {
-            if (board[i][j] == token && board[i][j + 1] == token && board[i][j + 2] == token && board[i][j + 3] == token)
+            if (board[i][j] == token && board[i][j + 1] == token && board[i][j + 2] == token && board[i][j + 3] == token) {
                 return true;
+            }
         }
     }
-
-    // Vertical check
     for (int j = 0; j < COLS; j++) {
         for (int i = 0; i < ROWS - 3; i++) {
-            if (board[i][j] == token && board[i + 1][j] == token && board[i + 2][j] == token && board[i + 3][j] == token)
+            if (board[i][j] == token && board[i + 1][j] == token && board[i + 2][j] == token && board[i + 3][j] == token) {
                 return true;
+            }
         }
     }
-
-    // Diagonal checks
     for (int i = 0; i < ROWS - 3; i++) {
         for (int j = 0; j < COLS - 3; j++) {
-            if (board[i][j] == token && board[i + 1][j + 1] == token && board[i + 2][j + 2] == token && board[i + 3][j + 3] == token)
+            if (board[i][j] == token && board[i + 1][j + 1] == token && board[i + 2][j + 2] == token && board[i + 3][j + 3] == token) {
                 return true;
-        }
-        for (int j = 3; j < COLS; j++) {
-            if (board[i][j] == token && board[i + 1][j - 1] == token && board[i + 2][j - 2] == token && board[i + 3][j - 3] == token)
+            }
+            if (board[i][j + 3] == token && board[i + 1][j + 2] == token && board[i + 2][j + 1] == token && board[i + 3][j] == token) {
                 return true;
+            }
         }
     }
-
     return false;
 }
 
-// Verifica si el juego ha terminado
 bool gameOver(char board[][COLS]) {
     return checkFour(board, COMPUTERMOVE) || checkFour(board, HUMANMOVE);
 }
 
-// Maneja cada juego individualmente
+void computerMove(char board[][COLS], int client_sock) {
+    bool validMove = false;
+    int column;
+    do {
+        column = rand() % COLS;
+        for (int i = ROWS - 1; i >= 0 && !validMove; i--) {
+            if (board[i][column] == ' ') {
+                board[i][column] = COMPUTERMOVE;
+                validMove = true;
+            }
+        }
+    } while (!validMove);
+
+    if (gameOver(board)) {
+        showBoard(board, client_sock);
+        const char* loseMsg = "Game Over: Computer wins!\n";
+        send(client_sock, loseMsg, strlen(loseMsg), 0);
+        close(client_sock);
+    } else {
+        showBoard(board, client_sock);
+        //continue;
+    }
+}
+
 void* playGame(void* arg) {
     int client_sock = *((int*)arg);
     char board[ROWS][COLS];
     initialise(board);
-    showBoard(board, client_sock);
+
+    srand(time(NULL));
+    bool computerStarts = rand() % 2 == 0;
+
+    if (computerStarts) {
+        computerMove(board, client_sock);
+    } else {
+        showBoard(board, client_sock);
+    }
 
     char buffer[1024];
     int n_bytes;
 
     while ((n_bytes = recv(client_sock, buffer, 1024, 0)) > 0) {
-        buffer[n_bytes] = '\0'; // Null-terminate string
-        int column = atoi(buffer) - 1; // Convert buffer to column index
+        buffer[n_bytes] = '\0';
+        int column = atoi(buffer) - 1;
+
+        if (buffer[0] == 'Q') {
+            close(client_sock);
+            break;
+        }
 
         if (column >= 0 && column < COLS) {
             bool validMove = false;
@@ -101,35 +137,18 @@ void* playGame(void* arg) {
                 send(client_sock, msg, strlen(msg), 0);
             } else {
                 if (gameOver(board)) {
+                    showBoard(board, client_sock);
                     const char* winMsg = "Game Over: You win!\n";
                     send(client_sock, winMsg, strlen(winMsg), 0);
                     break;
                 }
 
-                // Computer's move
-                do {
-                    column = rand() % COLS;
-                    validMove = false;
-                    for (int i = ROWS - 1; i >= 0 && !validMove; i--) {
-                        if (board[i][column] == ' ') {
-                            board[i][column] = COMPUTERMOVE;
-                            validMove = true;
-                        }
-                    }
-                } while (!validMove);
-
-                if (gameOver(board)) {
-                    const char* loseMsg = "Game Over: Computer wins!\n";
-                    send(client_sock, loseMsg, strlen(loseMsg), 0);
-                    break;
-                }
+                computerMove(board, client_sock);
             }
         } else {
             const char* errMsg = "Invalid input. Please enter a column number from 1 to 7.\n";
             send(client_sock, errMsg, strlen(errMsg), 0);
         }
-
-        showBoard(board, client_sock);
     }
 
     close(client_sock);
@@ -137,7 +156,6 @@ void* playGame(void* arg) {
     return NULL;
 }
 
-// Configura el servidor y escucha las conexiones entrantes
 int main(int argc, char **argv) {
     int port = 12345;
     if (argc > 1) port = atoi(argv[1]);
