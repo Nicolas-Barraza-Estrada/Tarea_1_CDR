@@ -101,6 +101,7 @@ public:
 
     void startGame() {
         srand(time(NULL));
+        
         bool computerStarts = rand() % 2 == 0;
 
         if (computerStarts) {
@@ -156,9 +157,20 @@ public:
 
 void* server_thread(void* arg) {
     int client_sock = *((int*)arg);
+    struct sockaddr_in client_addr;
+    socklen_t client_addr_len = sizeof(client_addr);
+    if (getpeername(client_sock, (struct sockaddr *)&client_addr, &client_addr_len) == -1) {
+        cerr << "Error obteniendo la dirección IP del cliente" << endl;
+        return NULL;
+    }
+    
+    char *client_ip = inet_ntoa(client_addr.sin_addr);
+    cout << "Juego nuevo [" << client_ip << "]" << endl;
+
     Game* game = new Game(client_sock);
     game->startGame();
     delete game;
+    cout << "Juego terminado [" << client_ip << "]" << endl;
     return NULL;
 }
 
