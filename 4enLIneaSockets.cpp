@@ -136,7 +136,12 @@ public:
         while ((n_bytes = recv(client_sock, buffer, 1024, 0)) > 0) {
             buffer[n_bytes] = '\0';
             int column = atoi(buffer) - 1;
-
+            //terminar el juego si el jugador ingresa la letra Q
+            if (buffer[0] == 'Q') {
+                const char* quitMsg = "Game Over: You quit the game.\n";
+                send(client_sock, quitMsg, strlen(quitMsg), 0);
+                break;
+            }
             if (column >= 0 && column < COLS && board.makeMove(column, HUMANMOVE)) {
                 board.showBoard(client_sock);
                 if (board.gameOver()) {
@@ -165,12 +170,13 @@ void* server_thread(void* arg) {
     }
     
     char *client_ip = inet_ntoa(client_addr.sin_addr);
-    cout << "Juego nuevo [" << client_ip << "]" << endl;
+    int client_port = ntohs(client_addr.sin_port);
+    cout << "Juego nuevo [" << client_ip << ":" << client_port << "]" << endl;
 
     Game* game = new Game(client_sock);
     game->startGame();
     delete game;
-    cout << "Juego terminado [" << client_ip << "]" << endl;
+    cout << "Juego terminado [" << client_ip << ":" << client_port << "]" << endl;
     return NULL;
 }
 
