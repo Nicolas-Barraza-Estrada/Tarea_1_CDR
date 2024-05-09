@@ -36,10 +36,6 @@ public:
         for (int i = 0; i < ROWS; i++) {
             for (int j = 0; j < COLS; j++) {
                 display += board[i][j] == ' ' ? ". " : string(1, board[i][j]) + " ";
-                // 1 2 3 4 5 6 7 bajo el tablero
-                if (i == ROWS - 1) {
-                    display += to_string(j + 1) + " ";
-                }
             }
             display += "\n";
         }
