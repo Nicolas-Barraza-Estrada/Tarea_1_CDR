@@ -10,7 +10,7 @@
 #define ROWS 6
 #define COLS 7
 #define COMPUTERMOVE 'S'
-#define HUMANMOVE 'T'
+#define HUMANMOVE 'C'
 
 using namespace std;
 
@@ -36,6 +36,10 @@ public:
         for (int i = 0; i < ROWS; i++) {
             for (int j = 0; j < COLS; j++) {
                 display += board[i][j] == ' ' ? ". " : string(1, board[i][j]) + " ";
+                // 1 2 3 4 5 6 7 bajo el tablero
+                if (i == ROWS - 1) {
+                    display += to_string(j + 1) + " ";
+                }
             }
             display += "\n";
         }
@@ -95,18 +99,29 @@ class Game {
 private:
     Board board;
     int client_sock;
+    const char* client_ip;
+    int client_port;
 
 public:
-    Game(int sock) : client_sock(sock) {}
+    Game(int client_sock, const char* client_ip, int client_port) {
+        this->client_sock = client_sock;
+        this->client_ip = client_ip;
+        this->client_port = client_port;
+        cout << "Juego nuevo [" << client_ip << ":" << client_port << "]" << endl;
+    }
 
-    void startGame() {
+    void startGame(){
         srand(time(NULL));
         
         bool computerStarts = rand() % 2 == 0;
 
         if (computerStarts) {
+            //Juego [IP2:puerto2]: inicia juego el servidor.
+            cout << "Juego [" << client_ip << ":" << client_port << "]: inicia juego el servidor." << endl;
             computerMove();
         } else {
+            //Juego [IP2:puerto2]: inicia juego el cliente.
+            cout << "Juego [" << client_ip << ":" << client_port << "]: inicia juego el cliente." << endl;
             board.showBoard(client_sock);
         }
 
@@ -120,10 +135,14 @@ public:
             column = rand() % COLS;
             validMove = board.makeMove(column, COMPUTERMOVE);
         } while (!validMove);
-
+        //Juego [IP2:puerto2]: el servidor juega en la columna X.
+        cout << "Juego [" << client_ip << ":" << client_port << "]: el servidor juega en la columna " << column + 1 << "." << endl;
+        
         board.showBoard(client_sock);
         if (board.gameOver()) {
             const char* loseMsg = "Game Over: Computer wins!\n";
+            //Juego [IP2:puerto2]: el servidor gana.
+            cout << "Juego [" << client_ip << ":" << client_port << "]: el servidor gana." << endl;
             send(client_sock, loseMsg, strlen(loseMsg), 0);
             close(client_sock);
         }
@@ -143,9 +162,13 @@ public:
                 break;
             }
             if (column >= 0 && column < COLS && board.makeMove(column, HUMANMOVE)) {
+                //Juego [IP2:puerto2]: el cliente juega en la columna X.
+                cout << "Juego [" << client_ip << ":" << client_port << "]: el cliente juega en la columna " << column + 1 << "." << endl;
                 board.showBoard(client_sock);
                 if (board.gameOver()) {
                     const char* winMsg = "Game Over: You win!\n";
+                    //Juego [IP2:puerto2]: el cliente gana.
+                    cout << "Juego [" << client_ip << ":" << client_port << "]: el cliente gana." << endl;
                     send(client_sock, winMsg, strlen(winMsg), 0);
                     break;
                 }
@@ -162,6 +185,7 @@ public:
 
 void* server_thread(void* arg) {
     int client_sock = *((int*)arg);
+
     struct sockaddr_in client_addr;
     socklen_t client_addr_len = sizeof(client_addr);
     if (getpeername(client_sock, (struct sockaddr *)&client_addr, &client_addr_len) == -1) {
@@ -171,10 +195,10 @@ void* server_thread(void* arg) {
     
     char *client_ip = inet_ntoa(client_addr.sin_addr);
     int client_port = ntohs(client_addr.sin_port);
-    cout << "Juego nuevo [" << client_ip << ":" << client_port << "]" << endl;
+    //cout << "Juego nuevo [" << client_ip << ":" << client_port << "]" << endl;
 
-    Game* game = new Game(client_sock);
-    game->startGame();
+    Game* game = new Game(client_sock, client_ip, client_port);
+    game->startGame();//inicia el juego
     delete game;
     cout << "Juego terminado [" << client_ip << ":" << client_port << "]" << endl;
     return NULL;
