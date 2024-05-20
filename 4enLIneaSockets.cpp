@@ -6,6 +6,7 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <netdb.h>
 
 #define ROWS 6
 #define COLS 7
@@ -228,6 +229,13 @@ int main(int argc, char **argv) {
     }
 
     cout << "Server listening on port " << port << endl;
+
+    char hostname[1024];
+    gethostname(hostname, 1024);
+    struct hostent* host_info = gethostbyname(hostname);
+    char* server_ip = inet_ntoa(*(struct in_addr*)host_info->h_addr);
+    cout << "Server IP address: " << server_ip << endl;
+
     sockaddr_in client_addr;
     socklen_t client_addr_size = sizeof(client_addr);
 
