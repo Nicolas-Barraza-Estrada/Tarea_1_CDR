@@ -2,6 +2,7 @@
 #include <cstring>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <poll.h>
 
 #define BUFFER_SIZE 1024
 
@@ -40,26 +41,43 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    struct pollfd fds[2];
+    fds[0].fd = sock;
+    fds[0].events = POLLIN;
+    fds[1].fd = fileno(stdin);
+    fds[1].events = POLLIN;
+
     char buffer[BUFFER_SIZE];
     while (true) {
-        int n_bytes = recv(sock, buffer, BUFFER_SIZE, 0);
-        if (n_bytes <= 0) {
-            break;
-        }
-        buffer[n_bytes] = '\0';
-        string response(buffer);
-        displayBoard(response);
-
-        if (response.find("Game Over") != string::npos) {
+        int poll_count = poll(fds, 2, -1);
+        if (poll_count < 0) {
+            cerr << "Poll error" << endl;
             break;
         }
 
-        string input;
-        getline(cin, input);
-        send(sock, input.c_str(), input.length(), 0);
+        if (fds[0].revents & POLLIN) {
+            int n_bytes = recv(sock, buffer, BUFFER_SIZE - 1, 0);
+            if (n_bytes <= 0) {
+                cout << "Server closed connection or error occurred" << endl;
+                break;
+            }
+            buffer[n_bytes] = '\0';
+            string response(buffer);
+            displayBoard(response);
 
-        if (input == "Q") {
-            break;
+            if (response.find("Game Over") != string::npos) {
+                break;
+            }
+        }
+
+        if (fds[1].revents & POLLIN) {
+            string input;
+            getline(cin, input);
+            send(sock, input.c_str(), input.length(), 0);
+
+            if (input == "Q") {
+                break;
+            }
         }
     }
 
