@@ -1,4 +1,4 @@
 client
 server
-4enLineaCliente.o
-4enLineaServer.o
+client.o
+server.o
