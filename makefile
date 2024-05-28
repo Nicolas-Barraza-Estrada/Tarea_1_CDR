@@ -9,8 +9,8 @@ CLIENT_TARGET = client
 SERVER_TARGET = server
 
 # Archivos fuente
-CLIENT_SRCS = 4enLineaCliente.cpp
-SERVER_SRCS = 4enLineaServer.cpp
+CLIENT_SRCS = client.cpp
+SERVER_SRCS = server.cpp
 
 # Archivos objeto (se derivan automáticamente de los archivos fuente)
 CLIENT_OBJS = $(CLIENT_SRCS:.cpp=.o)
