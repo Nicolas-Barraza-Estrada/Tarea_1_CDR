@@ -8,7 +8,6 @@
 #include <pthread.h>
 #include <netdb.h>
 
-
 #define ROWS 6
 #define COLS 7
 #define COMPUTERMOVE 'S'
@@ -88,8 +87,23 @@ public:
         return false;
     }
 
+    bool isFull() {
+        for (int i = 0; i < ROWS; i++) {
+            for (int j = 0; j < COLS; j++) {
+                if (board[i][j] == ' ') {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
     bool gameOver() {
-        return checkFour(COMPUTERMOVE) || checkFour(HUMANMOVE);
+        return checkFour(COMPUTERMOVE) || checkFour(HUMANMOVE) || isFull();
+    }
+
+    bool isDraw() {
+        return isFull() && !checkFour(COMPUTERMOVE) && !checkFour(HUMANMOVE);
     }
 };
 
@@ -135,9 +149,15 @@ public:
         
         board.showBoard(client_sock);
         if (board.gameOver()) {
-            const char* loseMsg = "Game Over: Computer wins!\n";
-            cout << "Juego [" << client_ip << ":" << client_port << "]: el servidor gana." << endl;
-            send(client_sock, loseMsg, strlen(loseMsg), 0);
+            if (board.checkFour(COMPUTERMOVE)) {
+                const char* loseMsg = "Game Over: Computer wins!\n";
+                cout << "Juego [" << client_ip << ":" << client_port << "]: el servidor gana." << endl;
+                send(client_sock, loseMsg, strlen(loseMsg), 0);
+            } else if (board.isDraw()) {
+                const char* drawMsg = "Game Over: It's a draw!\n";
+                cout << "Juego [" << client_ip << ":" << client_port << "]: empate." << endl;
+                send(client_sock, drawMsg, strlen(drawMsg), 0);
+            }
             close(client_sock);
         }
     }
@@ -158,9 +178,15 @@ public:
                 cout << "Juego [" << client_ip << ":" << client_port << "]: el cliente juega en la columna " << column + 1 << "." << endl;
                 board.showBoard(client_sock);
                 if (board.gameOver()) {
-                    const char* winMsg = "Game Over: You win!\n";
-                    cout << "Juego [" << client_ip << ":" << client_port << "]: el cliente gana." << endl;
-                    send(client_sock, winMsg, strlen(winMsg), 0);
+                    if (board.checkFour(HUMANMOVE)) {
+                        const char* winMsg = "Game Over: You win!\n";
+                        cout << "Juego [" << client_ip << ":" << client_port << "]: el cliente gana." << endl;
+                        send(client_sock, winMsg, strlen(winMsg), 0);
+                    } else if (board.isDraw()) {
+                        const char* drawMsg = "Game Over: It's a draw!\n";
+                        cout << "Juego [" << client_ip << ":" << client_port << "]: empate." << endl;
+                        send(client_sock, drawMsg, strlen(drawMsg), 0);
+                    }
                     break;
                 }
                 computerMove();
@@ -226,8 +252,6 @@ int main(int argc, char **argv) {
     struct hostent* host_info = gethostbyname(hostname);
     char* server_ip = inet_ntoa(*(struct in_addr*)host_info->h_addr);
     cout << "Server IP address: " << server_ip << endl;
-
-
 
     cout << "Server listening on port " << port << endl;
     sockaddr_in client_addr;
