@@ -40,7 +40,7 @@ public:
             }
             display += "\n";
         }
-        display += "Enter the column number (1-7) to place your disc:\n";
+        display += "Ingrese el numero de la columna (1-7) para colocar su ficha\n";
         send(client_sock, display.c_str(), display.length(), 0);
     }
 
@@ -55,7 +55,7 @@ public:
     }
 
     bool checkFour(char token) {
-        // Horizontal, vertical, and diagonal checks
+        // Horizontal, vertical, y diagonal
         for (int i = 0; i < ROWS; i++) {
             for (int j = 0; j < COLS - 3; j++) {
                 if (board[i][j] == token && board[i][j + 1] == token &&
@@ -87,7 +87,7 @@ public:
         return false;
     }
 
-    bool isFull() {
+    bool isFull() { // Verifica si el tablero está lleno (empate)
         for (int i = 0; i < ROWS; i++) {
             for (int j = 0; j < COLS; j++) {
                 if (board[i][j] == ' ') {
@@ -98,7 +98,7 @@ public:
         return true;
     }
 
-    bool gameOver() {
+    bool gameOver() { // Verifica si el juego ha terminado
         return checkFour(COMPUTERMOVE) || checkFour(HUMANMOVE) || isFull();
     }
 
@@ -165,7 +165,7 @@ public:
     void receiveMoves() {
         char buffer[1024];
         int n_bytes;
-
+        //Solicita y recibe la columna del cliente
         while ((n_bytes = recv(client_sock, buffer, 1024, 0)) > 0) {
             buffer[n_bytes] = '\0';
             int column = atoi(buffer) - 1;
@@ -221,9 +221,9 @@ void* server_thread(void* arg) {
 }
 
 int main(int argc, char **argv) {
-    int port = 12345;
+    int port = 12345; // Puerto predeterminado si no se especifica en el argumento
     if (argc > 1) {
-        port = atoi(argv[1]);
+        port = atoi(argv[1]); //conexión de puerto variable
     }
 
     int server_sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -264,7 +264,7 @@ int main(int argc, char **argv) {
             continue;
         }
 
-        pthread_t tid;
+        pthread_t tid;  // Crea un nuevo hilo para manejar diferentes clientes
         pthread_create(&tid, NULL, server_thread, new int(client_sock));
         pthread_detach(tid);
     }
